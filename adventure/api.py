@@ -7,10 +7,10 @@ from django.contrib.auth.models import User
 from .models import *
 from rest_framework.decorators import api_view
 import json
+from .dungeon_maker import Dungeon
 
 # instantiate pusher
 # pusher = Pusher(app_id=config('PUSHER_APP_ID'), key=config('PUSHER_KEY'), secret=config('PUSHER_SECRET'), cluster=config('PUSHER_CLUSTER'))
-
 
 @csrf_exempt
 @api_view(["GET"])
@@ -20,14 +20,16 @@ def initialize(request):
     player_id = player.id
     uuid = player.uuid
     room = player.room()
+    current_room = player.currentRoom
     players = room.playerNames(player_id)
-    return JsonResponse({'uuid': uuid, 'name': player.user.username, 'title': room.title, 'description': room.description, 'players': players}, safe=True)
+    return JsonResponse({'uuid': uuid, 'name':player.user.username, 'title':room.title, 'description':room.description, 'players':players,
+                        'current_room': current_room}, safe=True)
 
 
 # @csrf_exempt
 @api_view(["POST"])
 def move(request):
-    dirs = {"n": "north", "s": "south", "e": "east", "w": "west"}
+    dirs={"n": "north", "s": "south", "e": "east", "w": "west"}
     reverse_dirs = {"n": "south", "s": "north", "e": "west", "w": "east"}
     player = request.user.player
     player_id = player.id
@@ -35,6 +37,7 @@ def move(request):
     data = json.loads(request.body)
     direction = data['direction']
     room = player.room()
+    current_room = player.currentRoom
     nextRoomID = None
     if direction == "n":
         nextRoomID = room.n_to
@@ -46,19 +49,47 @@ def move(request):
         nextRoomID = room.w_to
     if nextRoomID is not None and nextRoomID > 0:
         nextRoom = Room.objects.get(id=nextRoomID)
-        player.currentRoom = nextRoomID
+        player.currentRoom=nextRoomID
         player.save()
         players = nextRoom.playerNames(player_id)
         currentPlayerUUIDs = room.playerUUIDs(player_id)
         nextPlayerUUIDs = nextRoom.playerUUIDs(player_id)
-        return JsonResponse({'name': player.user.username, 'title': nextRoom.title, 'description': nextRoom.description, 'players': players, 'error_msg': ""}, safe=True)
+        # for p_uuid in currentPlayerUUIDs:
+        #     pusher.trigger(f'p-channel-{p_uuid}', u'broadcast', {'message':f'{player.user.username} has walked {dirs[direction]}.'})
+        # for p_uuid in nextPlayerUUIDs:
+        #     pusher.trigger(f'p-channel-{p_uuid}', u'broadcast', {'message':f'{player.user.username} has entered from the {reverse_dirs[direction]}.'})
+        return JsonResponse({'name':player.user.username, 'title':nextRoom.title, 'description':nextRoom.description, 'players':players, 'error_msg':"", "current_room":current_room}, safe=True)
     else:
         players = room.playerNames(player_id)
-        return JsonResponse({'name': player.user.username, 'title': room.title, 'description': room.description, 'players': players, 'error_msg': "You cannot move that way."}, safe=True)
+        return JsonResponse({'name':player.user.username, 'title':room.title, 'description':room.description, 'players':players, 'error_msg':"You cannot move that way.", "current_room":current_room}, safe=True)
 
 
 @csrf_exempt
 @api_view(["POST"])
 def say(request):
     # IMPLEMENT
-    return JsonResponse({'error': "Not yet implemented"}, safe=True, status=500)
+    return JsonResponse({'error':"Not yet implemented"}, safe=True, status=500)
+
+@api_view(["GET"])
+def get_rooms(request):
+    return JsonResponse({"rooms": list(Room.objects.values().order_by('id'))})
+
+@api_view(["GET"])
+def make_dungeon(request):
+    try:
+        Room.objects.all().delete()
+    except:
+        pass
+    
+    d = Dungeon(11,11)
+    d.generate_dungeon()
+    
+    return JsonResponse({"rooms": list(Room.objects.values())})
+
+@api_view(['GET'])
+def set_players(request):
+    players=Player.objects.all()
+    for p in players:
+        p.currentRoom=1100
+        p.save()
+    return JsonResponse({"Complete":"Complete"})
