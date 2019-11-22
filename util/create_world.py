@@ -8,7 +8,7 @@ r_outside = Room(title="Outside Cave Entrance",
                description="North of you, the cave mount beckons")
 
 r_foyer = Room(title="Foyer", description="""Dim light filters in from the south. Dusty
-passages run north and east.""")
+passages run north and east, be careful of your step adventurer.""")
 
 r_overlook = Room(title="Grand Overlook", description="""A steep cliff appears before you, falling
 into the darkness. Ahead to the north, a light flickers in
@@ -44,4 +44,3 @@ players=Player.objects.all()
 for p in players:
   p.currentRoom=r_outside.id
   p.save()
-
